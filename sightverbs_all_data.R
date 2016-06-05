@@ -1,5 +1,17 @@
 ## PACKAGES 
 
+# This script analyzes raw ratings of verb pairs.  
+# - formats the raw output, applies condition labels, and does basic checks at the individual, group, and word level
+# - checks correlations across groups and across individuals (starting line 361) 
+# - turns ratings ito distance matrices and applies (starting line 548)
+#   - hierarchical clustering with plots + bootstrap (line 641/715)
+#   - multidimensional scaling (standard and with SMACOF lines 787, 844) 
+#   - indivudal differences scaling (IndScal, line) 
+#   - 
+
+    1037
+
+
 if (!require("pracma")) {install.packages("pracma"); require("pracma")}
 #if (!require("xlsx")) {install.packages("xlsx"); require("xlsx")}
 if (!require("ez")) {install.packages("ez"); require("ez")}
@@ -192,10 +204,6 @@ namesD = sub(pattern="Perception","",namesD); namesD = sub(pattern="Perception",
 
 mp<-barplot2(meansD, beside = TRUE,horiz=FALSE,
              col = c("red4","red1","royalblue4","royalblue1","grey30","grey60","red4","red1","royalblue4","royalblue1","purple4","purple1"),
-             #col = c("red4","red1","royalblue4","royalblue1","seagreen4","seagreen1","grey30","grey60","grey30","grey60","grey30","grey60"),
-             #col = c("red4","red1","royalblue4","royalblue1","purple4","purple1"),
-             #col = c("red4","red1","royalblue4","royalblue1","royalblue4","royalblue1","purple4","purple1","purple4","purple1","royalblue4","royalblue1"),
-             #col = pal(6),
              axes = TRUE,
              space = rep(c(1,0),length(conditions)),
              density  = c(-1,-1,-1,-1,-1, -1, 10, 10, 10,10,10,10),
@@ -782,10 +790,6 @@ pvar <- heatmap.2(squaredata.varM[ hc$order, hc$order],trace = 'none', dendrogra
 
 #### MDS ########################################################################################
 
-#--------------------------------------------------------------------
-#-------USING THIS FOR MDS ------------------------------------------ 
-#--------------------------------------------------------------------
-
 #pick your group and conditions 
 group = c("B")
 group = c("S")
@@ -823,17 +827,68 @@ for (l in 1:length(unique(vnames$C1))){
 
 vnames -> dis.square[[c]]$verbs
 
+## check basic MDS 
+
+MDS.space <- cmdscale(as.dist(dis.square[[c]][[group]]), k, eig=TRUE)
+
+#graph
+x <- MDS.space$points[,1]
+y <- MDS.space$points[,2]
+plot(x, y, type="n", xlab="", ylab="", main=paste(group,c))
+text(x, y, rownames(MDS.space$points), cex=1, col=vnames$color)
+
+#graph elbow GOF 
+gof = NA
+for(x in 1:k){gof[x] = sum(MDS.space$eig[x])/sum(abs(MDS.space$eig))}
+plot(gof,type='o')
+title(conditions, k)
+
+sum(MDS.space$eig[1])/sum(MDS.space$eig[MDS.space$eig>0])  #GOF 2
+
+##SMACOF version 
+# uses majorization algorithm. The objective function to be minimized is known as stress and functions which majorize stress are elaborated.
+
+group = "S"
+group = "B"
+
+MDSsma.space.metric  <- smacofSym(as.dist(dis.square[[c]][[group]]), 2,type="ratio")
+
+
+#graph metric 
+x2 <- -MDSsma.space.metric$conf[,1]
+y2 <- -MDSsma.space.metric$conf[,2]
+plot(x2, y2, type="n", xlab="", ylab="", main=paste("metric", group,conditions), asp=1)
+text(x2, y2, rownames(MDSsma.space.metric$conf), cex=1, col=vnames$color)
+
+#graph "scree" gof elbow metric 
+result<-vector("list",k)
+for (i in 1:k){
+  result[[i]]<- smacofSym(as.dist(dis.square[[c]][[group]]), i, type="ratio")
+}
+stress<- sapply(result, function(x) x$stress)
+plot(1:k,stress[1:k],type='o', main=paste("metric", group,conditions))
+
+#check groups against each other (note save MDSsma.space.nonmetric by group name) 
+rcorr(MDSsma.space.nonmetricR$conf[,d],MDSsma.space.nonmetricS$conf[,d])
+rcorr(MDSsma.space.nonmetricB$conf[,d],MDSsma.space.nonmetricS$conf[,d])
+
+
+#other plots
+plot(MDSsma.space.metric,plot.type = "Shepard")
+plot(MDSsma.space.metric, plot.type = "resplot")
+points(MDSsma.space.metric$obsdiss, MDSsma.space.metric$confdiss, col="red")
+plot(MDSsma.space.metric, plot.type = "bubbleplot")
+
 
 ## INDSCAL for all participants  ------------------------------------------------------
 
 #get rid of the participants with missing data ### BETTER WAY IS TO SET THE WEIGHT MATRIX TO 0!!  
 
-
 group = "S"
 group = "B"
 
 temp <- subj.dis.square[[c]][sapply(subj.dis.square[[c]],function(x) !any(is.na(x)))]
-temp <- subj.dis.square[[c]]
+#temp <- subj.dis.square[[c]]
 
 temp<-temp[grepl(group[1],names(temp))]
 #temp<-temp[grepl("S",names(temp)) | grepl("B",names(temp))]
@@ -845,6 +900,7 @@ temp2 <- temp[c(1:length(temp))]
 # 
 IDS.space.nonmetric <- smacofIndDiff(temp2,constraint="indscal",ndim=10) #,metric=FALSE)
 IDS.space <- IDS.space.nonmetric
+
 
 #graph
 dim1<-1; dim2<-2; dim3<-3
@@ -882,8 +938,6 @@ for(s in 1:length(IDS.space$conf)){
     #points(x, y,pch=19, col=subjcol[s],cex=.8)}
 }
 
-#text(x1,y1, names(x1), cex=.7, col=(rainbow(59,v=1, alpha=.6)))
-#text(x1,y1, names(x1), cex=.7, col= vnames$color2 ,font=2)
 points(flip*x1, y1,pch=5, col="black",cex=.9);points(flip*x1, y1,pch=5, col="black",cex=.9);points(flip*x1, y1,pch=5, col="black",cex=.9);points(flip*x1, y1,pch=5, col="black",cex=.9);
 points(flip*x1, y1,pch=18, col=vnames$color2,cex=.8);points(flip*x1, y1,pch=18, col=vnames$color2,cex=.8);points(flip*x1, y1,pch=18, col=vnames$color2,cex=.8);points(flip*x1, y1,pch=18, col=vnames$color2,cex=.8);
 #text(x1,y1, names(x1), cex=.7, col=("black"),adj=-.5)
@@ -898,7 +952,6 @@ if(group=="B")
   {IDS.space -> IDS.space.blind}
 
 t.test(IDS.space.blind$sps,IDS.space.sighted$sps)
-
 
 # differences in stress between groups?
 IDSstress<-list()
@@ -932,10 +985,90 @@ sorted <- sort(IDS.space$spp, decreasing = TRUE)
 sortedcol <- ifelse(grepl(vnames$V1==names(sorted)),vname$color,"darkred")
 barplot(sort(IDS.space$spp, decreasing = TRUE), main = paste("Stress",group,c), cex.names = .8,las=2, col=sortedcol) #,ylim=c(0,.6)) 
 
-
-
 x <- sort.int(IDS.space$spp,index.return = T)
 plot( x$x, type = "h")
 text(x$x+3, names(x$x),srt=90, col = vnames$color[x$ix] )
+
+## Silly 3D Plots 
+
+#3D
+s3d<-scatterplot3d(x1,y1,z1, main="3D Scatterplot",type="p",angle=30,pch=" ", zlim = c(-1,1), xlim = c(-2,2), ylim = c(-2,2), scale.y=1,box=FALSE)
+for(s in 1:length(IDS.space$conf)){  
+  x <- IDS.space$conf[[s]][,dim1]
+  y <- IDS.space$conf[[s]][,dim2]
+  z <- IDS.space$conf[[s]][,dim3] 
+  
+  if(grepl("S",names(IDS.space$conf[s]))){
+    # points(x, y,pch=19, col=rgb(1,0,0,.6),cex=1.5)}  
+    #points(s3d$xyz.convert(x,y,z),pch=19, col=rgb(1,0,0,.6),cex=1.5, type="h")
+    #s3d$points3d(x,y,z,pch=20, col=rainbow(15,.6),cex=1.5, type="h")
+    s3d$points3d(x,y,z,pch=20, col=rgb(1,0,0,.6),cex=1.5, type="p")  
+  }
+  
+  if(grepl("B",names(IDS.space$conf[s]))){
+    #points(x, y,pch=19, col=rgb(.5,0,0,.6),cex=1.5)}  
+    #points(s3d$xyz.convert(x,y,z),pch=19, col=rgb(.5,0,0,.6),cex=1.5, type = "h")
+    #s3d$points3d(x,y,z,pch=20, col=rainbow(15,.6),cex=1.5, type="h")
+    s3d$points3d(x,y,z,pch=20, col=rgb(.5,0,0,.6),cex=1.5, type="p")  }
+}
+#text(s3d$xyz.convert(x1,y1,z1),labels=names(x1),col=rainbow(15))
+s3d$points3d(x1,y1,z1,pch=" ", col=rgb(0,0,0,1),cex=1.5, type="h",lwd=2)  
+text(s3d$xyz.convert(x1,y1,z1),labels=names(x1),col="black",pos=3)
+
+#3d 2 
+plot3d(x1, y1, z1, size=1, type="s", lighting=TRUE, shade=0, col="black",box=FALSE)
+for(s in 1:length(IDS.space$conf)){  
+  x <- IDS.space$conf[[s]][,dim1]
+  y <- IDS.space$conf[[s]][,dim2]
+  z <- IDS.space$conf[[s]][,dim3] 
+  
+  if(grepl("S",names(IDS.space$conf[s]))){
+    #plot3d(x, y, z, col=rainbow(15,.6), size=1, type="s",add=TRUE)  
+    plot3d(x, y, z, col=rgb(1,0,0,.6), size=1, type="s",add=TRUE)  
+  }
+  
+  if(grepl("B",names(IDS.space$conf[s]))){
+    #plot3d(x, y, z, col=rainbow(15,.6), size=1, type="s",add=TRUE)
+    plot3d(x, y, z, col=rgb(.1,0,0,.6), size=1, type="s",add=TRUE)  
+  }
+}
+#text(s3d$xyz.convert(x1,y1,z1),labels=names(x1),col=rainbow(15))
+text3d(x1,y1,z1,text=names(x1))
+scatter3d(x1, y1, z1,surface=TRUE,type="h")
+
+
+
+## Other Reduction Approaches (check against Ward Hierarchical) 
+
+# Determine number of clusters
+wssB <- (nrow(dis.square[[c]][["B"]])-1)*sum(apply(dis.square[[c]][[group]],2,var))
+for (i in 1:10) wssB[i] <- sum(kmeans(dis.square[[c]][["B"]], centers=i)$withinss)
+
+wssS <- (nrow(dis.square[[c]][["S"]])-1)*sum(apply(dis.square[[c]][[group]],2,var))
+for (i in 1:10) wssS[i] <- sum(kmeans(dis.square[[c]][["S"]], centers=i)$withinss)
+
+plot(1:10, wssB, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares", col = "darkred")
+lines(1:10, wssS, type = "b", col = "red")
+legend("topright",c("Blind","Sighted"), fill = c("darkred","red"))
+
+#K metroids -- use when there aren't "objective" parameters for the dimensions space (e.g. when there is only a distnace matrix)
+library(fpc)
+library(MASS)
+
+group = "S"
+c
+
+pamk.best <- pamk(dis.square[[c]][[group]], diss=T, usepam = T)
+cat("number of clusters estimated by optimum average silhouette width:", pamk.best$nc, "\n")
+pamk.data <- pam(as.dist(dis.square[[c]][[group]]), pamk.best$nc, diss=T)
+
+pamk.mds <- cmdscale(dis.square[[c]][[group]],pamk.best$nc)
+eqscplot(pamk.mds,col=pamk.data$clustering, pch=pamk.data$clustering)
+
+summary(pamk.data)
+plot(pamk.data,color="red",cex.names =.8,nmax.lab=100)
+
+barplot(pamk.data$silinfo$widths[,3],horiz = T,las=2,cex.name=.8)
 
 
