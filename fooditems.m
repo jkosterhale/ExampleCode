@@ -1,5 +1,11 @@
 function fooditems(subID, testing, therun)
 
+%this is a script used to present stimuli to participants during a functional fMRI scan.   
+%participants see someone's name and picture (randomaly drawn, gender matched) [agent]
+%a stated preference they have ("I prefer chocolate") 
+%and a decision they made (mouse movement to 1 of 4 specific pictures presented on the screen (circle around screen center)
+
+%participants are sometimes asked to make predictions about what the agent will choose; sometimes asked to remember what someone said; sometimes asked to remember which item they picked
 
 
 keynums = [25:39 89:95]; %keyboard key numbers that correspond to 1~4 buttons and scanner buttons
