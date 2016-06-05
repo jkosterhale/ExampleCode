@@ -1,16 +1,13 @@
-## PACKAGES 
-
 # This script analyzes raw ratings of verb pairs.  
 # - formats the raw output, applies condition labels, and does basic checks at the individual, group, and word level
 # - checks correlations across groups and across individuals (starting line 361) 
 # - turns ratings ito distance matrices and applies (starting line 548)
 #   - hierarchical clustering with plots + bootstrap (line 641/715)
 #   - multidimensional scaling (standard and with SMACOF lines 787, 844) 
-#   - indivudal differences scaling (IndScal, line) 
-#   - 
+#   - indivudal differences scaling (IndScal, line 883) 
+#   - K medoids to check space in subjective (distance matrix only) frame (line 1055)
 
-    1037
-
+## PACKAGES 
 
 if (!require("pracma")) {install.packages("pracma"); require("pracma")}
 #if (!require("xlsx")) {install.packages("xlsx"); require("xlsx")}
@@ -1052,7 +1049,7 @@ plot(1:10, wssB, type="b", xlab="Number of Clusters",
 lines(1:10, wssS, type = "b", col = "red")
 legend("topright",c("Blind","Sighted"), fill = c("darkred","red"))
 
-#K metroids -- use when there aren't "objective" parameters for the dimensions space (e.g. when there is only a distnace matrix)
+#K medoids -- use when there aren't "objective" parameters for the dimensions space (e.g. when there is only a distance matrix)
 library(fpc)
 library(MASS)
 
